@@ -14,9 +14,9 @@ header {
     margin-bottom: 25px;
 }
 
-/* Dynamic, high-impact athletic header */
+/* Dynamic athletic header */
 header h1 {
-    margin: 0;
+    margin: 0 0 12px 0;
     font-size: 32px;
     font-weight: 900;
     font-style: italic;
@@ -26,6 +26,31 @@ header h1 {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Filter Dropdown Styling */
+.filter-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    color: #b0b0b0;
+}
+
+.filter-container select {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border: 1px solid #444;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    outline: none;
+}
+
+.filter-container select:hover {
+    border-color: #cf0a2c;
 }
 
 /* Vertical Ticker Box Container */
@@ -103,7 +128,7 @@ header h1 {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 230px;
+    max-width: 220px;
 }
 
 .score {
