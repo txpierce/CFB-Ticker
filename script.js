@@ -1,234 +1,345 @@
-body {
-    font-family: Arial, sans-serif;
-    background-color: #120f0d;
-    color: #e6dfd5;
-    margin: 0;
-    padding: 20px 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 90vh;
+let currentQuery = 'groups=80';
+let gamesData = [];
+let previousScores = {}; 
+let rankingsMap = {};
+let currentIndex = 0;
+let slideInterval = null;
+const CARD_HEIGHT = 80;
+
+window.addEventListener('DOMContentLoaded', () => {
+    fetchAllData();
+});
+
+async function fetchAllData() {
+    // Run rankings and scores concurrently, but don't let rankings failure block the scoreboard
+    await Promise.allSettled([
+        fetchRankings(),
+        fetchScores()
+    ]);
 }
 
-/* Single-Line Top Bar */
-.top-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-    max-width: 650px;
-    margin-bottom: 15px;
-    padding: 0 5px;
+async function fetchRankings() {
+    try {
+        const response = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/college-football/rankings');
+        const data = await response.json();
+        rankingsMap = {};
+        if (data.rankings && data.rankings.length > 0) {
+            const topPoll = data.rankings[0]; 
+            if (topPoll && topPoll.ranks) {
+                topPoll.ranks.forEach(item => {
+                    if (item.team && item.team.id) {
+                        rankingsMap[item.team.id] = item.current;
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.warn('Rankings fetch failed, proceeding without rankings:', error);
+    }
 }
 
-/* ESPN-style bold athletic header */
-.top-bar h1 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 900;
-    font-style: italic;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    background: linear-gradient(135deg, #f5f0eb 20%, #d97706 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+async function fetchScores() {
+    const API_URL = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?${currentQuery}&limit=200`;
+
+    try {
+        const response = await fetch(API_URL);
+        const data = await response.json();
+        let events = data.events || [];
+        
+        let favorites = getFavorites();
+
+        if (currentQuery === 'favorites') {
+            events = events.filter(event => {
+                const comp = event.competitions[0];
+                return comp.competitors.some(c => favorites.includes(c.team.id));
+            });
+        } else if (currentQuery === 'top25') {
+            events = events.filter(event => {
+                const comp = event.competitions[0];
+                return comp.competitors.some(c => rankingsMap[c.team.id] && rankingsMap[c.team.id] <= 25);
+            });
+        } else if (currentQuery === 'live') {
+            events = events.filter(event => event.status.type.state === 'in');
+        }
+
+        gamesData = events;
+        if (currentIndex >= gamesData.length) currentIndex = 0;
+
+        const tickerContainer = document.getElementById('ticker-container');
+        if (gamesData.length > 0) {
+            renderTickerItems();
+            startTickerAnimation();
+        } else {
+            if (slideInterval) clearInterval(slideInterval);
+            tickerContainer.style.transform = 'translateY(0px)';
+            tickerContainer.innerHTML = `
+                <div class="ticker-item"><span style="margin: auto;">No matching games found.</span></div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error fetching scoreboard:', error);
+        document.getElementById('ticker-container').innerHTML = `
+            <div class="ticker-item"><span style="margin: auto;">Failed to load scores. Check console.</span></div>
+        `;
+    }
 }
 
-/* Subtle Filter Dropdown */
-.top-bar select {
-    background-color: #1a1412;
-    color: #bfa181;
-    border: 1px solid #3d2c22;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    outline: none;
-    transition: all 0.2s ease;
+function changeFilter() {
+    currentQuery = document.getElementById('filter-select').value;
+    fetchAllData();
 }
 
-.top-bar select:hover {
-    border-color: #d97706;
-    color: #f5f0eb;
+function getFavorites() {
+    try {
+        return JSON.parse(localStorage.getItem('cfb_favorites')) || [];
+    } catch {
+        return [];
+    }
 }
 
-/* Vertical Ticker Box Container */
-.ticker-wrap {
-    width: 100%;
-    max-width: 650px;
-    height: 80px; /* Locked to exact card height */
-    overflow: hidden;
-    background-color: #181210;
-    border-radius: 6px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8);
-    border-top: 2px solid #b45309;
-    border-bottom: 2px solid #b45309;
-    position: relative;
-    cursor: pointer;
+function toggleFavorite(event, teamId) {
+    event.stopPropagation();
+    let favorites = getFavorites();
+    if (favorites.includes(teamId)) {
+        favorites = favorites.filter(id => id !== teamId);
+    } else {
+        favorites.push(teamId);
+    }
+    localStorage.setItem('cfb_favorites', JSON.stringify(favorites));
+    renderTickerItems();
 }
 
-.ticker-wrap:hover::after {
-    content: "Click for Game Details";
-    position: absolute;
-    bottom: 4px;
-    right: 8px;
-    font-size: 10px;
-    color: #8c7355;
-    background: rgba(0,0,0,0.6);
-    padding: 2px 6px;
-    border-radius: 3px;
-    pointer-events: none;
+function parseTeamData(competitor) {
+    const teamId = competitor.team.id;
+    const name = competitor.team.shortDisplayName || competitor.team.name;
+    const score = competitor.score ?? '0';
+    const logo = competitor.team.logo || '';
+    
+    let rank = '';
+    const mappedRank = rankingsMap[teamId];
+    if (mappedRank && mappedRank <= 25) {
+        rank = `#${mappedRank}`;
+    }
+
+    const favorites = getFavorites();
+    const isFav = favorites.includes(teamId);
+
+    return { teamId, name, score, logo, rank, isFav };
 }
 
-/* The rolling list container */
-.ticker {
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.6s ease-in-out;
+function formatCentralTime(dateString) {
+    const date = new Date(dateString);
+    if (isNaN(date)) return '';
+    return date.toLocaleTimeString('en-US', {
+        timeZone: 'America/Chicago',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
 }
 
-/* Individual Score Item - Fixed strictly to 80px */
-.ticker-item {
-    height: 80px;
-    min-height: 80px;
-    max-height: 80px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    font-size: 15px;
-    font-weight: bold;
-    box-sizing: border-box;
+function renderTickerItems() {
+    const tickerContainer = document.getElementById('ticker-container');
+    let html = '';
+
+    gamesData.forEach(event => {
+        const competition = event.competitions[0];
+        const homeComp = competition.competitors.find(c => c.homeAway === 'home');
+        const awayComp = competition.competitors.find(c => c.homeAway === 'away');
+
+        if (!homeComp || !awayComp) return;
+
+        const home = parseTeamData(homeComp);
+        const away = parseTeamData(awayComp);
+
+        let awayFlash = false;
+        let homeFlash = false;
+        if (previousScores[awayComp.id] !== undefined && previousScores[awayComp.id] !== away.score) awayFlash = true;
+        if (previousScores[homeComp.id] !== undefined && previousScores[homeComp.id] !== home.score) homeFlash = true;
+        
+        previousScores[awayComp.id] = away.score;
+        previousScores[homeComp.id] = home.score;
+
+        const statusType = event.status.type.state;
+        const statusDetail = event.status.type.detail; 
+
+        let tvChannel = '';
+        if (competition.broadcasts && competition.broadcasts.length > 0) {
+            const b = competition.broadcasts.find(x => x.names && x.names.length > 0);
+            if (b) tvChannel = b.names[0];
+        }
+
+        let displayStatus = statusDetail;
+        if (statusType === 'pre') {
+            const ct = formatCentralTime(event.date);
+            displayStatus = ct ? `${ct} CT` : event.status.type.shortDetail;
+        }
+
+        const badgeContent = tvChannel ? `${displayStatus} • ${tvChannel}` : displayStatus;
+
+        html += `
+            <div class="ticker-item" data-eventid="${event.id}">
+                <div class="team-info">
+                    <div class="team-row">
+                        <div class="team-left">
+                            <button class="star-btn ${away.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${away.teamId}')">★</button>
+                            ${away.rank ? `<span class="team-rank">${away.rank}</span>` : ''}
+                            ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
+                            <span class="team-name">${away.name}</span>
+                        </div>
+                        <span class="score ${awayFlash ? 'score-flash' : ''}">${away.score}</span>
+                    </div>
+                    <div class="team-row">
+                        <div class="team-left">
+                            <button class="star-btn ${home.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${home.teamId}')">★</button>
+                            ${home.rank ? `<span class="team-rank">${home.rank}</span>` : ''}
+                            ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
+                            <span class="team-name">${home.name}</span>
+                        </div>
+                        <span class="score ${homeFlash ? 'score-flash' : ''}">${home.score}</span>
+                    </div>
+                </div>
+                <div class="status-badge">${badgeContent}</div>
+            </div>
+        `;
+    });
+
+    if (gamesData.length > 0) {
+        const firstEvent = gamesData[0];
+        const comp = firstEvent.competitions[0];
+        const homeComp = comp.competitors.find(c => c.homeAway === 'home');
+        const awayComp = comp.competitors.find(c => c.homeAway === 'away');
+        
+        if (homeComp && awayComp) {
+            const home = parseTeamData(homeComp);
+            const away = parseTeamData(awayComp);
+            
+            let tvChannel = '';
+            if (comp.broadcasts && comp.broadcasts.length > 0) {
+                const b = comp.broadcasts.find(x => x.names && x.names.length > 0);
+                if (b) tvChannel = b.names[0];
+            }
+            let firstStatus = firstEvent.status.type.shortDetail;
+            if (firstEvent.status.type.state === 'pre') {
+                const ct = formatCentralTime(firstEvent.date);
+                firstStatus = ct ? `${ct} CT` : firstStatus;
+            }
+            const badgeContent = tvChannel ? `${firstStatus} • ${tvChannel}` : firstStatus;
+            
+            html += `
+                <div class="ticker-item" data-eventid="${firstEvent.id}">
+                    <div class="team-info">
+                        <div class="team-row">
+                            <div class="team-left">
+                                <button class="star-btn ${away.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${away.teamId}')">★</button>
+                                ${away.rank ? `<span class="team-rank">${away.rank}</span>` : ''}
+                                ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
+                                <span class="team-name">${away.name}</span>
+                            </div>
+                            <span class="score">${away.score}</span>
+                        </div>
+                        <div class="team-row">
+                            <div class="team-left">
+                                <button class="star-btn ${home.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${home.teamId}')">★</button>
+                                ${home.rank ? `<span class="team-rank">${home.rank}</span>` : ''}
+                                ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
+                                <span class="team-name">${home.name}</span>
+                            </div>
+                            <span class="score">${home.score}</span>
+                        </div>
+                    </div>
+                    <div class="status-badge">${badgeContent}</div>
+                </div>
+            `;
+        }
+    }
+
+    tickerContainer.innerHTML = html;
 }
 
-.team-info {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex-grow: 1;
-    margin-right: 20px;
+function startTickerAnimation() {
+    if (slideInterval) clearInterval(slideInterval);
+
+    slideInterval = setInterval(() => {
+        currentIndex++;
+        const tickerContainer = document.getElementById('ticker-container');
+        tickerContainer.style.transform = `translateY(-${currentIndex * CARD_HEIGHT}px)`;
+
+        if (currentIndex >= gamesData.length) {
+            setTimeout(() => {
+                tickerContainer.style.transition = 'none';
+                currentIndex = 0;
+                tickerContainer.style.transform = `translateY(0px)`;
+                setTimeout(() => {
+                    tickerContainer.style.transition = 'transform 0.6s ease-in-out';
+                }, 50);
+            }, 650); 
+        }
+    }, 4000); 
 }
 
-.team-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+// Modal Detail Popup
+async function openGameModal() {
+    if (gamesData.length === 0) return;
+    const activeEvent = gamesData[currentIndex % gamesData.length];
+    const modal = document.getElementById('game-modal');
+    const modalBody = document.getElementById('modal-body');
+    
+    modal.style.display = 'flex';
+    modalBody.innerHTML = '<h3>Loading live game stats...</h3>';
+
+    try {
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=${activeEvent.id}`);
+        const summary = await res.json();
+        
+        const comp = summary.header.competitions[0];
+        const competitors = comp.competitors;
+        const away = competitors.find(c => c.homeAway === 'away');
+        const home = competitors.find(c => c.homeAway === 'home');
+
+        let html = `
+            <h2 style="text-align:center; margin-bottom: 5px; font-size: 16px; color: #d97706;">${summary.header.competitions[0].status.type.detail}</h2>
+            <hr style="border-color: #3d2c22; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 20px;">
+                <div>${away.team.shortDisplayName}: <span style="color:#10b981;">${away.score}</span></div>
+                <div style="color: #8c7355; font-size: 14px; align-self: center;">@</div>
+                <div>${home.team.shortDisplayName}: <span style="color:#10b981;">${home.score}</span></div>
+            </div>
+        `;
+
+        if (summary.boxscore && summary.boxscore.linescores) {
+            html += `<h4 style="color: #d97706; margin-bottom: 8px;">Quarter Scores</h4><table style="width:100%; text-align:center; margin-bottom:15px; border-collapse:collapse; font-size: 13px;">`;
+            html += `<tr style="border-bottom:1px solid #3d2c22; color: #8c7355;"><th style="text-align:left;">Team</th>`;
+            summary.boxscore.linescores[0].linescores.forEach((_, idx) => html += `<th>Q${idx+1}</th>`);
+            html += `<th>T</th></tr>`;
+
+            competitors.forEach(c => {
+                html += `<tr><td style="text-align:left; padding:6px 0;">${c.team.shortDisplayName}</td>`;
+                if (summary.boxscore.linescores) {
+                    const teamLines = summary.boxscore.linescores.find(l => l.team.id === c.team.id);
+                    if (teamLines && teamLines.linescores) {
+                        teamLines.linescores.forEach(q => html += `<td>${q.value}</td>`);
+                    }
+                }
+                html += `<td><b>${c.score}</b></td></tr>`;
+            });
+            html += `</table>`;
+        }
+
+        if (summary.drives && summary.drives.current) {
+            html += `<h4 style="color: #d97706; margin-bottom: 6px;">Current Drive</h4><p style="font-size:13px; color:#bfa181;">${summary.drives.current.description || 'No active drive summary.'}</p>`;
+        }
+
+        modalBody.innerHTML = html;
+    } catch (e) {
+        console.error(e);
+        modalBody.innerHTML = '<h3>Failed to load game summary details.</h3>';
+    }
 }
 
-.team-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    overflow: hidden;
+function closeGameModal() {
+    document.getElementById('game-modal').style.display = 'none';
 }
 
-.star-btn {
-    background: none;
-    border: none;
-    color: #4a3b32;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 0;
-}
-
-.star-btn.favorited {
-    color: #f59e0b;
-}
-
-.team-logo {
-    width: 20px;
-    height: 20px;
-    object-fit: contain;
-    flex-shrink: 0;
-}
-
-.team-rank {
-    font-size: 12px;
-    color: #d97706;
-    font-weight: bold;
-    min-width: 18px;
-}
-
-.team-name {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 280px;
-}
-
-.score {
-    color: #10b981;
-    font-family: monospace;
-    font-size: 16px;
-    font-weight: bold;
-}
-
-.status-badge {
-    background-color: #211915;
-    border: 1px solid #3d2c22;
-    padding: 6px 10px;
-    border-radius: 4px;
-    color: #d97706;
-    font-size: 11px;
-    text-transform: uppercase;
-    text-align: center;
-    min-width: 115px;
-    flex-shrink: 0;
-}
-
-/* Flash alert styling when a team scores */
-.score-flash {
-    color: #ef4444 !important;
-    animation: pulseScore 1s infinite alternate;
-}
-
-@keyframes pulseScore {
-    0% { opacity: 1; }
-    100% { opacity: 0.4; }
-}
-
-/* Modal Popup Window */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.85);
-    align-items: center;
-    justify-content: center;
-}
-
-.modal-content {
-    background-color: #181210;
-    border: 1px solid #3d2c22;
-    padding: 25px;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 500px;
-    max-height: 80vh;
-    overflow-y: auto;
-    position: relative;
-    color: #f5f0eb;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.8);
-}
-
-.close-btn {
-    color: #8c7355;
-    position: absolute;
-    top: 15px;
-    right: 20px;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.close-btn:hover {
-    color: #f5f0eb;
-}
+// Background poll every 30 seconds
+setInterval(fetchAllData, 30000);
