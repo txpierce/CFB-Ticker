@@ -98,14 +98,14 @@ function toggleGridView() {
     const gridContainer = document.getElementById('grid-container');
 
     if (isGridView) {
-        btn.textContent = 'Ticker View';
+        btn.textContent = '≡';
         btn.classList.add('active');
         tickerWrap.style.display = 'none';
         gridContainer.style.display = 'grid';
         if (slideInterval) clearInterval(slideInterval);
         renderGridView();
     } else {
-        btn.textContent = 'Live Ranked Grid';
+        btn.textContent = '⊞';
         btn.classList.remove('active');
         tickerWrap.style.display = 'block';
         gridContainer.style.display = 'none';
@@ -117,7 +117,6 @@ function toggleGridView() {
 function renderGridView() {
     const gridContainer = document.getElementById('grid-container');
     
-    // Filter for live games where at least one team is ranked in the top 25
     const liveRankedGames = gamesData.filter(event => {
         const isLive = event.status.type.state === 'in';
         const comp = event.competitions[0];
@@ -238,14 +237,6 @@ function renderTickerItems() {
         const home = parseTeamData(homeComp);
         const away = parseTeamData(awayComp);
 
-        let awayFlash = false;
-        let homeFlash = false;
-        if (previousScores[awayComp.id] !== undefined && previousScores[awayComp.id] !== away.score) awayFlash = true;
-        if (previousScores[homeComp.id] !== undefined && previousScores[homeComp.id] !== home.score) homeFlash = true;
-        
-        previousScores[awayComp.id] = away.score;
-        previousScores[homeComp.id] = home.score;
-
         const statusType = event.status.type.state;
         const statusDetail = event.status.type.detail; 
 
@@ -273,7 +264,7 @@ function renderTickerItems() {
                             ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
                             <span class="team-name">${away.name}</span>
                         </div>
-                        <span class="score ${awayFlash ? 'score-flash' : ''}">${away.score}</span>
+                        <span class="score">${away.score}</span>
                     </div>
                     <div class="team-row">
                         <div class="team-left">
@@ -282,7 +273,7 @@ function renderTickerItems() {
                             ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
                             <span class="team-name">${home.name}</span>
                         </div>
-                        <span class="score ${homeFlash ? 'score-flash' : ''}">${home.score}</span>
+                        <span class="score">${home.score}</span>
                     </div>
                 </div>
                 <div class="status-badge">${badgeContent}</div>
@@ -365,7 +356,6 @@ function startTickerAnimation() {
     }, 4000); 
 }
 
-// Modal Detail Popup
 function openGameModal() {
     if (gamesData.length === 0) return;
     const activeEvent = gamesData[currentIndex % gamesData.length];
