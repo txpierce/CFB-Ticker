@@ -37,22 +37,27 @@ body {
 
 .top-controls {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
 }
 
-/* Toggle Grid Button */
+/* Compact Icon Grid Button */
 .grid-toggle-btn {
     background-color: #1a1412;
     color: #d97706;
     border: 1px solid #3d2c22;
-    padding: 4px 10px;
+    width: 28px;
+    height: 28px;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 16px;
     font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     outline: none;
     transition: all 0.2s ease;
+    padding: 0;
 }
 
 .grid-toggle-btn:hover, .grid-toggle-btn.active {
@@ -66,7 +71,7 @@ body {
     background-color: #1a1412;
     color: #bfa181;
     border: 1px solid #3d2c22;
-    padding: 4px 10px;
+    padding: 5px 10px;
     border-radius: 4px;
     font-size: 12px;
     font-weight: bold;
@@ -294,3 +299,4 @@ body {
 
 .close-btn:hover {
     color: #f5f0eb;
+}
