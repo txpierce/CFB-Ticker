@@ -91,6 +91,19 @@ function parseTeamData(competitor) {
     return { name, score, logo, rank };
 }
 
+// Helper function to convert game date/time string to Central Time
+function formatCentralTime(dateString) {
+    const date = new Date(dateString);
+    if (isNaN(date)) return '';
+    
+    return date.toLocaleTimeString('en-US', {
+        timeZone: 'America/Chicago',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+    });
+}
+
 function renderTickerItems() {
     const tickerContainer = document.getElementById('ticker-container');
     let html = '';
@@ -106,10 +119,9 @@ function renderTickerItems() {
         const statusType = event.status.type.state; // 'pre', 'in', 'post'
         const statusDetail = event.status.type.detail; 
 
-        // Extract broadcast TV channel (e.g., ABC, ESPN, FOX) if available
+        // Extract broadcast TV channel if available
         let tvChannel = '';
         if (competition.broadcasts && competition.broadcasts.length > 0) {
-            // Find the first valid broadcast network name
             const broadcast = competition.broadcasts.find(b => b.names && b.names.length > 0);
             if (broadcast) {
                 tvChannel = broadcast.names[0];
@@ -118,10 +130,12 @@ function renderTickerItems() {
 
         let displayStatus = statusDetail;
         if (statusType === 'pre') {
-            displayStatus = event.status.type.shortDetail; // e.g., "7:30 PM"
+            // Convert start time to Central Time Zone
+            const centralTime = formatCentralTime(event.date);
+            displayStatus = centralTime ? `${centralTime} CT` : event.status.type.shortDetail;
         }
 
-        // Combine status and TV network into the badge layout
+        // Combine status/time and TV network into the badge layout
         const badgeContent = tvChannel ? `${displayStatus} • ${tvChannel}` : displayStatus;
 
         html += `
@@ -161,7 +175,13 @@ function renderTickerItems() {
             const broadcast = comp.broadcasts.find(b => b.names && b.names.length > 0);
             if (broadcast) tvChannel = broadcast.names[0];
         }
-        const firstStatus = firstEvent.status.type.shortDetail;
+
+        let firstStatus = firstEvent.status.type.shortDetail;
+        if (firstEvent.status.type.state === 'pre') {
+            const centralTime = formatCentralTime(firstEvent.date);
+            firstStatus = centralTime ? `${centralTime} CT` : firstStatus;
+        }
+
         const badgeContent = tvChannel ? `${firstStatus} • ${tvChannel}` : firstStatus;
         
         html += `
