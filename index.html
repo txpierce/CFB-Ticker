@@ -8,28 +8,25 @@
 </head>
 <body>
 
-    <header>
+    <!-- Single-Line Header Bar -->
+    <header class="top-bar">
         <h1>College Football Scoreboard</h1>
-        
-        <!-- Subtle Filter Bar -->
-        <div class="controls-bar">
-            <select id="filter-select" onchange="changeFilter()">
-                <option value="groups=80">All FBS Games</option>
-                <option value="favorites">⭐ My Favorites Only</option>
-                <option value="top25">Top 25 Matchups Only</option>
-                <option value="live">Live Games Only</option>
-                <option value="groups=8">SEC</option>
-                <option value="groups=5">Big Ten</option>
-                <option value="groups=4">Big 12</option>
-                <option value="groups=1">ACC</option>
-                <option value="groups=151">FBS Independents</option>
-                <option value="groups=37">American Athletic</option>
-                <option value="groups=12">Conference USA</option>
-                <option value="groups=15">Mid-American (MAC)</option>
-                <option value="groups=17">Mountain West</option>
-                <option value="groups=9">Sun Belt</option>
-            </select>
-        </div>
+        <select id="filter-select" onchange="changeFilter()">
+            <option value="groups=80">All FBS Games</option>
+            <option value="favorites">⭐ My Favorites Only</option>
+            <option value="top25">Top 25 Matchups Only</option>
+            <option value="live">Live Games Only</option>
+            <option value="groups=8">SEC</option>
+            <option value="groups=5">Big Ten</option>
+            <option value="groups=4">Big 12</option>
+            <option value="groups=1">ACC</option>
+            <option value="groups=151">FBS Independents</option>
+            <option value="groups=37">American Athletic</option>
+            <option value="groups=12">Conference USA</option>
+            <option value="groups=15">Mid-American (MAC)</option>
+            <option value="groups=17">Mountain West</option>
+            <option value="groups=9">Sun Belt</option>
+        </select>
     </header>
 
     <!-- Scrolling Ticker Container -->
