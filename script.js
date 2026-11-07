@@ -1,8 +1,13 @@
-let currentQuery = 'groups=80'; // Default to All FBS
+let currentQuery = 'groups=80';
 let gamesData = [];
-let rankingsMap = {}; // Stores teamId -> rank number
+let previousScores = {}; 
+let rankingsMap = {};
 let currentIndex = 0;
 let slideInterval = null;
+
+window.addEventListener('DOMContentLoaded', () => {
+    fetchAllData();
+});
 
 async function fetchAllData() {
     await fetchRankings();
@@ -14,7 +19,6 @@ async function fetchRankings() {
         const response = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/college-football/rankings');
         const data = await response.json();
         rankingsMap = {};
-
         if (data.rankings && data.rankings.length > 0) {
             const topPoll = data.rankings[0]; 
             if (topPoll && topPoll.ranks) {
@@ -38,8 +42,14 @@ async function fetchScores() {
         const data = await response.json();
         let events = data.events || [];
         
-        // Handle custom client-side filters
-        if (currentQuery === 'top25') {
+        let favorites = getFavorites();
+
+        if (currentQuery === 'favorites') {
+            events = events.filter(event => {
+                const comp = event.competitions[0];
+                return comp.competitors.some(c => favorites.includes(c.team.id));
+            });
+        } else if (currentQuery === 'top25') {
             events = events.filter(event => {
                 const comp = event.competitions[0];
                 return comp.competitors.some(c => rankingsMap[c.team.id] && rankingsMap[c.team.id] <= 25);
@@ -49,7 +59,7 @@ async function fetchScores() {
         }
 
         gamesData = events;
-        currentIndex = 0; // Reset scroll index on filter change
+        if (currentIndex >= gamesData.length) currentIndex = 0;
 
         if (gamesData.length > 0) {
             renderTickerItems();
@@ -59,11 +69,11 @@ async function fetchScores() {
             if (slideInterval) clearInterval(slideInterval);
             tickerContainer.style.transform = 'translateY(0px)';
             tickerContainer.innerHTML = `
-                <div class="ticker-item"><span style="margin: auto;">No matching games found right now.</span></div>
+                <div class="ticker-item"><span style="margin: auto;">No matching games found.</span></div>
             `;
         }
     } catch (error) {
-        console.error('Error fetching ESPN scoreboard data:', error);
+        console.error('Error fetching scoreboard:', error);
         document.getElementById('ticker-container').innerHTML = `
             <div class="ticker-item"><span style="margin: auto;">Failed to load scores.</span></div>
         `;
@@ -71,9 +81,28 @@ async function fetchScores() {
 }
 
 function changeFilter() {
-    const selectElement = document.getElementById('filter-select');
-    currentQuery = selectElement.value;
+    currentQuery = document.getElementById('filter-select').value;
     fetchAllData();
+}
+
+function getFavorites() {
+    try {
+        return JSON.parse(localStorage.getItem('cfb_favorites')) || [];
+    } catch {
+        return [];
+    }
+}
+
+function toggleFavorite(event, teamId) {
+    event.stopPropagation();
+    let favorites = getFavorites();
+    if (favorites.includes(teamId)) {
+        favorites = favorites.filter(id => id !== teamId);
+    } else {
+        favorites.push(teamId);
+    }
+    localStorage.setItem('cfb_favorites', JSON.stringify(favorites));
+    renderTickerItems();
 }
 
 function parseTeamData(competitor) {
@@ -88,14 +117,15 @@ function parseTeamData(competitor) {
         rank = `#${mappedRank}`;
     }
 
-    return { name, score, logo, rank };
+    const favorites = getFavorites();
+    const isFav = favorites.includes(teamId);
+
+    return { teamId, name, score, logo, rank, isFav };
 }
 
-// Helper function to convert game date/time string to Central Time
 function formatCentralTime(dateString) {
     const date = new Date(dateString);
     if (isNaN(date)) return '';
-    
     return date.toLocaleTimeString('en-US', {
         timeZone: 'America/Chicago',
         hour: 'numeric',
@@ -110,52 +140,57 @@ function renderTickerItems() {
 
     gamesData.forEach(event => {
         const competition = event.competitions[0];
-        const homeCompetitor = competition.competitors.find(c => c.homeAway === 'home');
-        const awayCompetitor = competition.competitors.find(c => c.homeAway === 'away');
+        const homeComp = competition.competitors.find(c => c.homeAway === 'home');
+        const awayComp = competition.competitors.find(c => c.homeAway === 'away');
 
-        const home = parseTeamData(homeCompetitor);
-        const away = parseTeamData(awayCompetitor);
+        const home = parseTeamData(homeComp);
+        const away = parseTeamData(awayComp);
 
-        const statusType = event.status.type.state; // 'pre', 'in', 'post'
+        let awayFlash = false;
+        let homeFlash = false;
+        if (previousScores[awayComp.id] !== undefined && previousScores[awayComp.id] !== away.score) awayFlash = true;
+        if (previousScores[homeComp.id] !== undefined && previousScores[homeComp.id] !== home.score) homeFlash = true;
+        
+        previousScores[awayComp.id] = away.score;
+        previousScores[homeComp.id] = home.score;
+
+        const statusType = event.status.type.state;
         const statusDetail = event.status.type.detail; 
 
-        // Extract broadcast TV channel if available
         let tvChannel = '';
         if (competition.broadcasts && competition.broadcasts.length > 0) {
-            const broadcast = competition.broadcasts.find(b => b.names && b.names.length > 0);
-            if (broadcast) {
-                tvChannel = broadcast.names[0];
-            }
+            const b = competition.broadcasts.find(x => x.names && x.names.length > 0);
+            if (b) tvChannel = b.names[0];
         }
 
         let displayStatus = statusDetail;
         if (statusType === 'pre') {
-            // Convert start time to Central Time Zone
-            const centralTime = formatCentralTime(event.date);
-            displayStatus = centralTime ? `${centralTime} CT` : event.status.type.shortDetail;
+            const ct = formatCentralTime(event.date);
+            displayStatus = ct ? `${ct} CT` : event.status.type.shortDetail;
         }
 
-        // Combine status/time and TV network into the badge layout
         const badgeContent = tvChannel ? `${displayStatus} • ${tvChannel}` : displayStatus;
 
         html += `
-            <div class="ticker-item">
+            <div class="ticker-item" data-eventid="${event.id}">
                 <div class="team-info">
                     <div class="team-row">
                         <div class="team-left">
+                            <button class="star-btn ${away.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${away.teamId}')">★</button>
                             ${away.rank ? `<span class="team-rank">${away.rank}</span>` : ''}
                             ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
                             <span class="team-name">${away.name}</span>
                         </div>
-                        <span class="score">${away.score}</span>
+                        <span class="score ${awayFlash ? 'score-flash' : ''}">${away.score}</span>
                     </div>
                     <div class="team-row">
                         <div class="team-left">
+                            <button class="star-btn ${home.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${home.teamId}')">★</button>
                             ${home.rank ? `<span class="team-rank">${home.rank}</span>` : ''}
                             ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
                             <span class="team-name">${home.name}</span>
                         </div>
-                        <span class="score">${home.score}</span>
+                        <span class="score ${homeFlash ? 'score-flash' : ''}">${home.score}</span>
                     </div>
                 </div>
                 <div class="status-badge">${badgeContent}</div>
@@ -163,7 +198,6 @@ function renderTickerItems() {
         `;
     });
 
-    // Duplicate first item for seamless infinite loop
     if (gamesData.length > 0) {
         const firstEvent = gamesData[0];
         const comp = firstEvent.competitions[0];
@@ -172,23 +206,22 @@ function renderTickerItems() {
         
         let tvChannel = '';
         if (comp.broadcasts && comp.broadcasts.length > 0) {
-            const broadcast = comp.broadcasts.find(b => b.names && b.names.length > 0);
-            if (broadcast) tvChannel = broadcast.names[0];
+            const b = comp.broadcasts.find(x => x.names && x.names.length > 0);
+            if (b) tvChannel = b.names[0];
         }
-
         let firstStatus = firstEvent.status.type.shortDetail;
         if (firstEvent.status.type.state === 'pre') {
-            const centralTime = formatCentralTime(firstEvent.date);
-            firstStatus = centralTime ? `${centralTime} CT` : firstStatus;
+            const ct = formatCentralTime(firstEvent.date);
+            firstStatus = ct ? `${ct} CT` : firstStatus;
         }
-
         const badgeContent = tvChannel ? `${firstStatus} • ${tvChannel}` : firstStatus;
         
         html += `
-            <div class="ticker-item">
+            <div class="ticker-item" data-eventid="${firstEvent.id}">
                 <div class="team-info">
                     <div class="team-row">
                         <div class="team-left">
+                            <button class="star-btn ${away.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${away.teamId}')">★</button>
                             ${away.rank ? `<span class="team-rank">${away.rank}</span>` : ''}
                             ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
                             <span class="team-name">${away.name}</span>
@@ -197,6 +230,7 @@ function renderTickerItems() {
                     </div>
                     <div class="team-row">
                         <div class="team-left">
+                            <button class="star-btn ${home.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${home.teamId}')">★</button>
                             ${home.rank ? `<span class="team-rank">${home.rank}</span>` : ''}
                             ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
                             <span class="team-name">${home.name}</span>
@@ -215,11 +249,9 @@ function renderTickerItems() {
 function startTickerAnimation() {
     if (slideInterval) clearInterval(slideInterval);
 
-    // Changes score every 4 seconds
     slideInterval = setInterval(() => {
         currentIndex++;
         const tickerContainer = document.getElementById('ticker-container');
-        
         tickerContainer.style.transform = `translateY(-${currentIndex * 80}px)`;
 
         if (currentIndex >= gamesData.length) {
@@ -227,7 +259,6 @@ function startTickerAnimation() {
                 tickerContainer.style.transition = 'none';
                 currentIndex = 0;
                 tickerContainer.style.transform = `translateY(0px)`;
-                
                 setTimeout(() => {
                     tickerContainer.style.transition = 'transform 0.6s ease-in-out';
                 }, 50);
@@ -236,8 +267,68 @@ function startTickerAnimation() {
     }, 4000); 
 }
 
-// Initial fetch
-fetchAllData();
+// Modal Detail Popup
+async function openGameModal() {
+    if (gamesData.length === 0) return;
+    const activeEvent = gamesData[currentIndex % gamesData.length];
+    const modal = document.getElementById('game-modal');
+    const modalBody = document.getElementById('modal-body');
+    
+    modal.style.display = 'flex';
+    modalBody.innerHTML = '<h3>Loading live game stats...</h3>';
 
-// Refresh data every 60 seconds
-setInterval(fetchAllData, 60000);
+    try {
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=${activeEvent.id}`);
+        const summary = await res.json();
+        
+        const comp = summary.header.competitions[0];
+        const competitors = comp.competitors;
+        const away = competitors.find(c => c.homeAway === 'away');
+        const home = competitors.find(c => c.homeAway === 'home');
+
+        let html = `
+            <h2 style="text-align:center; margin-bottom: 5px; font-size: 16px; color: #d97706;">${summary.header.competitions[0].status.type.detail}</h2>
+            <hr style="border-color: #3d2c22; margin-bottom: 15px;">
+            <div style="display: flex; justify-content: space-between; text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 20px;">
+                <div>${away.team.shortDisplayName}: <span style="color:#10b981;">${away.score}</span></div>
+                <div style="color: #8c7355; font-size: 14px; align-self: center;">@</div>
+                <div>${home.team.shortDisplayName}: <span style="color:#10b981;">${home.score}</span></div>
+            </div>
+        `;
+
+        if (summary.boxscore && summary.boxscore.linescores) {
+            html += `<h4 style="color: #d97706; margin-bottom: 8px;">Quarter Scores</h4><table style="width:100%; text-align:center; margin-bottom:15px; border-collapse:collapse; font-size: 13px;">`;
+            html += `<tr style="border-bottom:1px solid #3d2c22; color: #8c7355;"><th style="text-align:left;">Team</th>`;
+            summary.boxscore.linescores[0].linescores.forEach((_, idx) => html += `<th>Q${idx+1}</th>`);
+            html += `<th>T</th></tr>`;
+
+            competitors.forEach(c => {
+                html += `<tr><td style="text-align:left; padding:6px 0;">${c.team.shortDisplayName}</td>`;
+                if (summary.boxscore.linescores) {
+                    const teamLines = summary.boxscore.linescores.find(l => l.team.id === c.team.id);
+                    if (teamLines && teamLines.linescores) {
+                        teamLines.linescores.forEach(q => html += `<td>${q.value}</td>`);
+                    }
+                }
+                html += `<td><b>${c.score}</b></td></tr>`;
+            });
+            html += `</table>`;
+        }
+
+        if (summary.drives && summary.drives.current) {
+            html += `<h4 style="color: #d97706; margin-bottom: 6px;">Current Drive</h4><p style="font-size:13px; color:#bfa181;">${summary.drives.current.description || 'No active drive summary.'}</p>`;
+        }
+
+        modalBody.innerHTML = html;
+    } catch (e) {
+        console.error(e);
+        modalBody.innerHTML = '<h3>Failed to load game summary details.</h3>';
+    }
+}
+
+function closeGameModal() {
+    document.getElementById('game-modal').style.display = 'none';
+}
+
+// Background poll every 30 seconds
+setInterval(fetchAllData, 30000);
