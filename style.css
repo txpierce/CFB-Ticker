@@ -1,390 +1,260 @@
-let currentQuery = 'groups=80';
-let selectedDate = '';
-let gamesData = [];
-let previousScores = {}; // Tracks score changes for flash alerts
-let rankingsMap = {};
-let currentIndex = 0;
-let slideInterval = null;
-let isPaused = false;
-
-// Initialize date picker to today in YYYYMMDD format
-window.addEventListener('DOMContentLoaded', () => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    document.getElementById('date-picker').value = `${yyyy}-${mm}-${dd}`;
-    selectedDate = `${yyyy}${mm}${dd}`;
-    fetchAllData();
-});
-
-async function fetchAllData() {
-    await fetchRankings();
-    await fetchScores();
+body {
+    font-family: Arial, sans-serif;
+    background-color: #121212;
+    color: #ffffff;
+    margin: 0;
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-async function fetchRankings() {
-    try {
-        const response = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/college-football/rankings');
-        const data = await response.json();
-        rankingsMap = {};
-        if (data.rankings && data.rankings.length > 0) {
-            const topPoll = data.rankings[0]; 
-            if (topPoll && topPoll.ranks) {
-                topPoll.ranks.forEach(item => {
-                    if (item.team && item.team.id) {
-                        rankingsMap[item.team.id] = item.current;
-                    }
-                });
-            }
-        }
-    } catch (error) {
-        console.error('Error fetching ESPN rankings:', error);
-    }
+header {
+    text-align: center;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 560px;
 }
 
-async function fetchScores() {
-    let dateParam = selectedDate ? `dates=${selectedDate}&` : '';
-    const API_URL = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?${dateParam}${currentQuery}&limit=200`;
-
-    try {
-        const response = await fetch(API_URL);
-        const data = await response.json();
-        let events = data.events || [];
-        
-        let favorites = getFavorites();
-
-        // Filters
-        if (currentQuery === 'favorites') {
-            events = events.filter(event => {
-                const comp = event.competitions[0];
-                return comp.competitors.some(c => favorites.includes(c.team.id));
-            });
-        } else if (currentQuery === 'top25') {
-            events = events.filter(event => {
-                const comp = event.competitions[0];
-                return comp.competitors.some(c => rankingsMap[c.team.id] && rankingsMap[c.team.id] <= 25);
-            });
-        } else if (currentQuery === 'live') {
-            events = events.filter(event => event.status.type.state === 'in');
-        }
-
-        gamesData = events;
-        if (currentIndex >= gamesData.length) currentIndex = 0;
-
-        if (gamesData.length > 0) {
-            renderTickerItems();
-            if (!isPaused) startTickerAnimation();
-        } else {
-            const tickerContainer = document.getElementById('ticker-container');
-            if (slideInterval) clearInterval(slideInterval);
-            tickerContainer.style.transform = 'translateY(0px)';
-            tickerContainer.innerHTML = `
-                <div class="ticker-item"><span style="margin: auto;">No matching games found.</span></div>
-            `;
-        }
-    } catch (error) {
-        console.error('Error fetching scoreboard:', error);
-        document.getElementById('ticker-container').innerHTML = `
-            <div class="ticker-item"><span style="margin: auto;">Failed to load scores.</span></div>
-        `;
-    }
+header h1 {
+    margin: 0 0 15px 0;
+    font-size: 32px;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #ffffff 30%, #cf0a2c 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
-function changeFilter() {
-    currentQuery = document.getElementById('filter-select').value;
-    fetchAllData();
+.controls-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    background: #1a1a1a;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
 }
 
-function changeDate() {
-    const val = document.getElementById('date-picker').value;
-    if (val) {
-        selectedDate = val.replace(/-/g, '');
-        fetchAllData();
-    }
+.filter-container {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
 }
 
-function getFavorites() {
-    try {
-        return JSON.parse(localStorage.getItem('cfb_favorites')) || [];
-    } catch {
-        return [];
-    }
+.filter-container select, .filter-container input {
+    background-color: #252525;
+    color: #ffffff;
+    border: 1px solid #444;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    outline: none;
 }
 
-function toggleFavorite(event, teamId) {
-    event.stopPropagation(); // Prevent opening modal
-    let favorites = getFavorites();
-    if (favorites.includes(teamId)) {
-        favorites = favorites.filter(id => id !== teamId);
-    } else {
-        favorites.push(teamId);
-    }
-    localStorage.setItem('cfb_favorites', JSON.stringify(favorites));
-    renderTickerItems();
+.filter-container select:hover, .filter-container input:hover {
+    border-color: #cf0a2c;
 }
 
-function parseTeamData(competitor) {
-    const teamId = competitor.team.id;
-    const name = competitor.team.shortDisplayName || competitor.team.name;
-    const score = competitor.score ?? '0';
-    const logo = competitor.team.logo || '';
-    
-    let rank = '';
-    const mappedRank = rankingsMap[teamId];
-    if (mappedRank && mappedRank <= 25) {
-        rank = `#${mappedRank}`;
-    }
-
-    const favorites = getFavorites();
-    const isFav = favorites.includes(teamId);
-
-    return { teamId, name, score, logo, rank, isFav };
+.nav-controls {
+    display: flex;
+    gap: 10px;
 }
 
-function formatCentralTime(dateString) {
-    const date = new Date(dateString);
-    if (isNaN(date)) return '';
-    return date.toLocaleTimeString('en-US', {
-        timeZone: 'America/Chicago',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-    });
+.nav-controls button {
+    background-color: #2c2c2c;
+    color: #fff;
+    border: 1px solid #444;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
 }
 
-function renderTickerItems() {
-    const tickerContainer = document.getElementById('ticker-container');
-    let html = '';
-
-    gamesData.forEach(event => {
-        const competition = event.competitions[0];
-        const homeComp = competition.competitors.find(c => c.homeAway === 'home');
-        const awayComp = competition.competitors.find(c => c.homeAway === 'away');
-
-        const home = parseTeamData(homeComp);
-        const away = parseTeamData(awayComp);
-
-        // Detect score change for flash alert
-        let awayFlash = false;
-        let homeFlash = false;
-        if (previousScores[awayComp.id] !== undefined && previousScores[awayComp.id] !== away.score) awayFlash = true;
-        if (previousScores[homeComp.id] !== undefined && previousScores[homeComp.id] !== home.score) homeFlash = true;
-        
-        previousScores[awayComp.id] = away.score;
-        previousScores[homeComp.id] = home.score;
-
-        const statusType = event.status.type.state;
-        const statusDetail = event.status.type.detail; 
-
-        let tvChannel = '';
-        if (competition.broadcasts && competition.broadcasts.length > 0) {
-            const b = competition.broadcasts.find(x => x.names && x.names.length > 0);
-            if (b) tvChannel = b.names[0];
-        }
-
-        let displayStatus = statusDetail;
-        if (statusType === 'pre') {
-            const ct = formatCentralTime(event.date);
-            displayStatus = ct ? `${ct} CT` : event.status.type.shortDetail;
-        }
-
-        const badgeContent = tvChannel ? `${displayStatus} • ${tvChannel}` : displayStatus;
-
-        html += `
-            <div class="ticker-item" data-eventid="${event.id}">
-                <div class="team-info">
-                    <div class="team-row">
-                        <div class="team-left">
-                            <button class="star-btn ${away.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${away.teamId}')">★</button>
-                            ${away.rank ? `<span class="team-rank">${away.rank}</span>` : ''}
-                            ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
-                            <span class="team-name">${away.name}</span>
-                        </div>
-                        <span class="score ${awayFlash ? 'score-flash' : ''}">${away.score}</span>
-                    </div>
-                    <div class="team-row">
-                        <div class="team-left">
-                            <button class="star-btn ${home.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${home.teamId}')">★</button>
-                            ${home.rank ? `<span class="team-rank">${home.rank}</span>` : ''}
-                            ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
-                            <span class="team-name">${home.name}</span>
-                        </div>
-                        <span class="score ${homeFlash ? 'score-flash' : ''}">${home.score}</span>
-                    </div>
-                </div>
-                <div class="status-badge">${badgeContent}</div>
-            </div>
-        `;
-    });
-
-    // Duplicate first item for infinite loop
-    if (gamesData.length > 0) {
-        const firstEvent = gamesData[0];
-        const comp = firstEvent.competitions[0];
-        const home = parseTeamData(comp.competitors.find(c => c.homeAway === 'home'));
-        const away = parseTeamData(comp.competitors.find(c => c.homeAway === 'away'));
-        
-        let tvChannel = '';
-        if (comp.broadcasts && comp.broadcasts.length > 0) {
-            const b = comp.broadcasts.find(x => x.names && x.names.length > 0);
-            if (b) tvChannel = b.names[0];
-        }
-        let firstStatus = firstEvent.status.type.shortDetail;
-        if (firstEvent.status.type.state === 'pre') {
-            const ct = formatCentralTime(firstEvent.date);
-            firstStatus = ct ? `${ct} CT` : firstStatus;
-        }
-        const badgeContent = tvChannel ? `${firstStatus} • ${tvChannel}` : firstStatus;
-        
-        html += `
-            <div class="ticker-item" data-eventid="${firstEvent.id}">
-                <div class="team-info">
-                    <div class="team-row">
-                        <div class="team-left">
-                            <button class="star-btn ${away.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${away.teamId}')">★</button>
-                            ${away.rank ? `<span class="team-rank">${away.rank}</span>` : ''}
-                            ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
-                            <span class="team-name">${away.name}</span>
-                        </div>
-                        <span class="score">${away.score}</span>
-                    </div>
-                    <div class="team-row">
-                        <div class="team-left">
-                            <button class="star-btn ${home.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${home.teamId}')">★</button>
-                            ${home.rank ? `<span class="team-rank">${home.rank}</span>` : ''}
-                            ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
-                            <span class="team-name">${home.name}</span>
-                        </div>
-                        <span class="score">${home.score}</span>
-                    </div>
-                </div>
-                <div class="status-badge">${badgeContent}</div>
-            </div>
-        `;
-    }
-
-    tickerContainer.innerHTML = html;
+.nav-controls button:hover {
+    background-color: #cf0a2c;
+    border-color: #cf0a2c;
 }
 
-function startTickerAnimation() {
-    if (slideInterval) clearInterval(slideInterval);
-    if (isPaused) return;
-
-    slideInterval = setInterval(() => {
-        currentIndex++;
-        const tickerContainer = document.getElementById('ticker-container');
-        tickerContainer.style.transform = `translateY(-${currentIndex * 80}px)`;
-
-        if (currentIndex >= gamesData.length) {
-            setTimeout(() => {
-                tickerContainer.style.transition = 'none';
-                currentIndex = 0;
-                tickerContainer.style.transform = `translateY(0px)`;
-                setTimeout(() => {
-                    tickerContainer.style.transition = 'transform 0.6s ease-in-out';
-                }, 50);
-            }, 650); 
-        }
-    }, 4000); 
+/* Vertical Ticker Box Container */
+.ticker-wrap {
+    width: 100%;
+    max-width: 560px;
+    height: 80px;
+    overflow: hidden;
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+    border-top: 3px solid #cf0a2c;
+    border-bottom: 3px solid #cf0a2c;
+    position: relative;
+    cursor: pointer;
 }
 
-// Manual Navigation Controls
-function nextCard() {
-    if (gamesData.length === 0) return;
-    currentIndex++;
-    if (currentIndex >= gamesData.length) currentIndex = 0;
-    updateTickerTransform();
+.ticker-wrap:hover::after {
+    content: "Click for Game Details";
+    position: absolute;
+    bottom: 4px;
+    right: 8px;
+    font-size: 10px;
+    color: #888;
+    background: rgba(0,0,0,0.6);
+    padding: 2px 6px;
+    border-radius: 3px;
+    pointer-events: none;
 }
 
-function prevCard() {
-    if (gamesData.length === 0) return;
-    currentIndex--;
-    if (currentIndex < 0) currentIndex = gamesData.length - 1;
-    updateTickerTransform();
+/* The rolling list container */
+.ticker {
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.6s ease-in-out;
 }
 
-function updateTickerTransform() {
-    const tickerContainer = document.getElementById('ticker-container');
-    tickerContainer.style.transform = `translateY(-${currentIndex * 80}px)`;
+/* Individual Score Item */
+.ticker-item {
+    height: 80px;
+    min-height: 80px;
+    max-height: 80px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    font-size: 15px;
+    font-weight: bold;
+    box-sizing: border-box;
 }
 
-function togglePlayPause() {
-    isPaused = !isPaused;
-    const btn = document.getElementById('play-pause-btn');
-    if (isPaused) {
-        clearInterval(slideInterval);
-        btn.innerText = '▶';
-    } else {
-        startTickerAnimation();
-        btn.innerText = '⏸';
-    }
+.team-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-grow: 1;
+    margin-right: 15px;
 }
 
-// Modal Detail Popup
-async function openGameModal() {
-    if (gamesData.length === 0) return;
-    const activeEvent = gamesData[currentIndex % gamesData.length];
-    const modal = document.getElementById('game-modal');
-    const modalBody = document.getElementById('modal-body');
-    
-    modal.style.display = 'flex';
-    modalBody.innerHTML = '<h3>Loading live game stats...</h3>';
-
-    try {
-        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=${activeEvent.id}`);
-        const summary = await res.json();
-        
-        const comp = summary.header.competitions[0];
-        const competitors = comp.competitors;
-        const away = competitors.find(c => c.homeAway === 'away');
-        const home = competitors.find(c => c.homeAway === 'home');
-
-        let html = `
-            <h2 style="text-align:center; margin-bottom: 5px;">${summary.header.competitions[0].status.type.detail}</h2>
-            <hr style="border-color: #444; margin-bottom: 15px;">
-            <div style="display: flex; justify-content: space-between; text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 20px;">
-                <div>${away.team.shortDisplayName}: <span style="color:#4cd137;">${away.score}</span></div>
-                <div>@</div>
-                <div>${home.team.shortDisplayName}: <span style="color:#4cd137;">${home.score}</span></div>
-            </div>
-        `;
-
-        // Add boxscore linescores if available
-        if (summary.boxscore && summary.boxscore.linescores) {
-            html += `<h4>Quarter Scores</h4><table style="width:100%; text-align:center; margin-bottom:15px; border-collapse:collapse;">`;
-            html += `<tr style="border-bottom:1px solid #444;"><th>Team</th>`;
-            summary.boxscore.linescores[0].linescores.forEach((_, idx) => html += `<th>Q${idx+1}</th>`);
-            html += `<th>T</th></tr>`;
-
-            competitors.forEach(c => {
-                html += `<tr><td style="text-align:left; padding:4px;">${c.team.shortDisplayName}</td>`;
-                if (summary.boxscore.linescores) {
-                    const teamLines = summary.boxscore.linescores.find(l => l.team.id === c.team.id);
-                    if (teamLines && teamLines.linescores) {
-                        teamLines.linescores.forEach(q => html += `<td>${q.value}</td>`);
-                    }
-                }
-                html += `<td><b>${c.score}</b></td></tr>`;
-            });
-            html += `</table>`;
-        }
-
-        // Add recent plays or drive info if available
-        if (summary.drives && summary.drives.current) {
-            html += `<h4>Current Drive</h4><p style="font-size:13px; color:#ccc;">${summary.drives.current.description || 'No active drive summary.'}</p>`;
-        }
-
-        modalBody.innerHTML = html;
-    } catch (e) {
-        console.error(e);
-        modalBody.innerHTML = '<h3>Failed to load game summary details.</h3>';
-    }
+.team-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
-function closeGameModal() {
-    document.getElementById('game-modal').style.display = 'none';
+.team-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
 }
 
-// Background poll every 30 seconds
-setInterval(fetchAllData, 30000);
+.star-btn {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+}
+
+.star-btn.favorited {
+    color: #fbc531;
+}
+
+.team-logo {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.team-rank {
+    font-size: 12px;
+    color: #fbc531;
+    font-weight: bold;
+    min-width: 18px;
+}
+
+.team-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 190px;
+}
+
+.score {
+    color: #4cd137;
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.status-badge {
+    background-color: #2c2c2c;
+    padding: 6px 10px;
+    border-radius: 4px;
+    color: #fbc531;
+    font-size: 11px;
+    text-transform: uppercase;
+    text-align: center;
+    min-width: 105px;
+    flex-shrink: 0;
+}
+
+/* Flash alert styling when a team scores */
+.score-flash {
+    color: #ff4757 !important;
+    animation: pulseScore 1s infinite alternate;
+}
+
+@keyframes pulseScore {
+    0% { opacity: 1; }
+    100% { opacity: 0.4; }
+}
+
+/* Modal Popup Window */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.8);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background-color: #1a1a1a;
+    border: 1px solid #444;
+    padding: 25px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    color: #fff;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.7);
+}
+
+.close-btn {
+    color: #aaa;
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-btn:hover {
+    color: #fff;
+}
