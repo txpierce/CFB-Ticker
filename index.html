@@ -10,12 +10,26 @@
 
     <header>
         <h1>CFB Live Ticker</h1>
+        <!-- Filter Controls -->
+        <div class="filter-container">
+            <label for="filter-select">View:</label>
+            <select id="filter-select" onchange="changeFilter()">
+                <option value="groups=80">All FBS Games</option>
+                <option value="top25">Top 25 Matchups Only</option>
+                <option value="live">Live Games Only</option>
+                <option value="groups=8">SEC</option>
+                <option value="groups=5">Big Ten</option>
+                <option value="groups=4">Big 12</option>
+                <option value="groups=1">ACC</option>
+                <option value="groups=17">Mountain West</option>
+            </select>
+        </div>
     </header>
 
     <!-- Scrolling Ticker Container -->
     <div class="ticker-wrap">
         <div class="ticker" id="ticker-container">
-            <div class="ticker-item">Loading live scores from ESPN...</div>
+            <div class="ticker-item"><span style="margin: auto;">Loading live scores from ESPN...</span></div>
         </div>
     </div>
 
