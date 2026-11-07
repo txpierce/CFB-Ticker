@@ -11,23 +11,32 @@ body {
 
 header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
 }
 
+/* Dynamic, high-impact athletic header */
 header h1 {
-    margin: 0 0 10px 0;
-    font-size: 24px;
+    margin: 0;
+    font-size: 32px;
+    font-weight: 900;
+    font-style: italic;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #ffffff 30%, #cf0a2c 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
 /* Vertical Ticker Box Container */
 .ticker-wrap {
     width: 100%;
-    max-width: 500px;
-    height: 80px; /* Exact height of one score card */
+    max-width: 520px;
+    height: 80px;
     overflow: hidden;
     background-color: #1e1e1e;
     border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
     border-top: 3px solid #cf0a2c;
     border-bottom: 3px solid #cf0a2c;
     position: relative;
@@ -65,15 +74,36 @@ header h1 {
 
 .team-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
+}
+
+.team-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+}
+
+.team-logo {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.team-rank {
+    font-size: 12px;
+    color: #fbc531;
+    font-weight: bold;
+    min-width: 20px;
 }
 
 .team-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 280px;
+    max-width: 230px;
 }
 
 .score {
