@@ -1,126 +1,85 @@
-const API_URL = 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=200';
-
-let gamesData = [];
-let currentIndex = 0;
-let slideInterval = null;
-
-async function fetchScores() {
-    try {
-        const response = await fetch(API_URL);
-        const data = await response.json();
-        gamesData = data.events || [];
-        
-        if (gamesData.length > 0) {
-            renderTickerItems();
-            startTickerAnimation();
-        } else {
-            document.getElementById('ticker-container').innerHTML = `
-                <div class="ticker-item"><span>No games scheduled for today.</span></div>
-            `;
-        }
-    } catch (error) {
-        console.error('Error fetching ESPN data:', error);
-        document.getElementById('ticker-container').innerHTML = `
-            <div class="ticker-item"><span>Failed to load scores.</span></div>
-        `;
-    }
+body {
+    font-family: Arial, sans-serif;
+    background-color: #121212;
+    color: #ffffff;
+    margin: 0;
+    padding: 40px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-function renderTickerItems() {
-    const tickerContainer = document.getElementById('ticker-container');
-    let html = '';
-
-    gamesData.forEach(event => {
-        const competition = event.competitions[0];
-        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
-        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
-
-        const homeName = homeTeam.team.shortDisplayName;
-        const homeScore = homeTeam.score ?? '0';
-        const awayName = awayTeam.team.shortDisplayName;
-        const awayScore = awayTeam.score ?? '0';
-
-        const statusType = event.status.type.state; // 'pre', 'in', 'post'
-        const statusDetail = event.status.type.detail; 
-
-        let displayStatus = statusDetail;
-        if (statusType === 'pre') {
-            displayStatus = event.status.type.shortDetail; // e.g., "7:30 PM"
-        }
-
-        html += `
-            <div class="ticker-item">
-                <div class="team-info">
-                    <div class="team-row">
-                        <span>${awayName}</span>
-                        <span class="score">${awayScore}</span>
-                    </div>
-                    <div class="team-row">
-                        <span>${homeName}</span>
-                        <span class="score">${homeScore}</span>
-                    </div>
-                </div>
-                <div class="status-badge">${displayStatus}</div>
-            </div>
-        `;
-    });
-
-    // Duplicate the first item at the end for an infinite loop illusion
-    if (gamesData.length > 0) {
-        const firstEvent = gamesData[0];
-        const competition = firstEvent.competitions[0];
-        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
-        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
-        
-        html += `
-            <div class="ticker-item">
-                <div class="team-info">
-                    <div class="team-row">
-                        <span>${awayTeam.team.shortDisplayName}</span>
-                        <span class="score">${awayTeam.score ?? '0'}</span>
-                    </div>
-                    <div class="team-row">
-                        <span>${homeTeam.team.shortDisplayName}</span>
-                        <span class="score">${homeTeam.score ?? '0'}</span>
-                    </div>
-                </div>
-                <div class="status-badge">${firstEvent.status.type.shortDetail}</div>
-            </div>
-        `;
-    }
-
-    tickerContainer.innerHTML = html;
+header {
+    text-align: center;
+    margin-bottom: 20px;
 }
 
-function startTickerAnimation() {
-    if (slideInterval) clearInterval(slideInterval);
-
-    // Changes score every 4 seconds (adjust this number to make it faster/slower)
-    slideInterval = setInterval(() => {
-        currentIndex++;
-        const tickerContainer = document.getElementById('ticker-container');
-        
-        // Slide up by 80px per item
-        tickerContainer.style.transform = `translateY(-${currentIndex * 80}px)`;
-
-        // When it hits the duplicated bottom item, instantly reset to top seamlessly
-        if (currentIndex >= gamesData.length) {
-            setTimeout(() => {
-                tickerContainer.style.transition = 'none';
-                currentIndex = 0;
-                tickerContainer.style.transform = `translateY(0px)`;
-                
-                // Re-enable smooth transition after reset
-                setTimeout(() => {
-                    tickerContainer.style.transition = 'transform 0.6s ease-in-out';
-                }, 50);
-            }, 650); // Matches the CSS transition time
-        }
-    }, 4000); 
+header h1 {
+    margin: 0 0 10px 0;
+    font-size: 24px;
 }
 
-// Initial fetch
-fetchScores();
+/* Vertical Ticker Box Container */
+.ticker-wrap {
+    width: 100%;
+    max-width: 450px;
+    height: 80px; /* Exact height of one score card */
+    overflow: hidden;
+    background-color: #1e1e1e;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    border-top: 3px solid #cf0a2c;
+    border-bottom: 3px solid #cf0a2c;
+    position: relative;
+}
 
-// Refresh data from ESPN in the background every 60 seconds
-setInterval(fetchScores, 60000);
+/* The rolling list container */
+.ticker {
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.6s ease-in-out;
+}
+
+/* Individual Score Item */
+.ticker-item {
+    height: 80px;
+    min-height: 80px;
+    max-height: 80px;
+    flex-shrink: 0; /* CRITICAL: Prevents flexbox from squishing items */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    font-size: 15px;
+    font-weight: bold;
+    box-sizing: border-box;
+}
+
+.team-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.team-row {
+    display: flex;
+    justify-content: space-between;
+    width: 250px;
+}
+
+.score {
+    color: #4cd137;
+    font-family: monospace;
+    font-size: 16px;
+}
+
+.status-badge {
+    background-color: #2c2c2c;
+    padding: 6px 10px;
+    border-radius: 4px;
+    color: #fbc531;
+    font-size: 11px;
+    text-transform: uppercase;
+    text-align: center;
+    min-width: 85px;
+}
