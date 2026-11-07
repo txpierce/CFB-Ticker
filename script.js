@@ -1,7 +1,35 @@
 let currentQuery = 'groups=80'; // Default to All FBS
 let gamesData = [];
+let rankingsMap = {}; // Stores teamId -> rank number
 let currentIndex = 0;
 let slideInterval = null;
+
+async function fetchAllData() {
+    await fetchRankings();
+    await fetchScores();
+}
+
+async function fetchRankings() {
+    try {
+        const response = await fetch('https://site.api.espn.com/apis/site/v2/sports/football/college-football/rankings');
+        const data = await response.json();
+        rankingsMap = {};
+
+        if (data.rankings && data.rankings.length > 0) {
+            // Usually the first poll is the AP Top 25 or CFP Rankings
+            const topPoll = data.rankings[0]; 
+            if (topPoll && topPoll.ranks) {
+                topPoll.ranks.forEach(item => {
+                    if (item.team && item.team.id) {
+                        rankingsMap[item.team.id] = item.current;
+                    }
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching ESPN rankings:', error);
+    }
+}
 
 async function fetchScores() {
     const API_URL = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?${currentQuery}&limit=200`;
@@ -15,7 +43,7 @@ async function fetchScores() {
         if (currentQuery === 'top25') {
             events = events.filter(event => {
                 const comp = event.competitions[0];
-                return comp.competitors.some(c => c.curRank && c.curRank <= 25);
+                return comp.competitors.some(c => rankingsMap[c.team.id] && rankingsMap[c.team.id] <= 25);
             });
         } else if (currentQuery === 'live') {
             events = events.filter(event => event.status.type.state === 'in');
@@ -36,7 +64,7 @@ async function fetchScores() {
             `;
         }
     } catch (error) {
-        console.error('Error fetching ESPN data:', error);
+        console.error('Error fetching ESPN scoreboard data:', error);
         document.getElementById('ticker-container').innerHTML = `
             <div class="ticker-item"><span style="margin: auto;">Failed to load scores.</span></div>
         `;
@@ -46,20 +74,20 @@ async function fetchScores() {
 function changeFilter() {
     const selectElement = document.getElementById('filter-select');
     currentQuery = selectElement.value;
-    fetchScores();
+    fetchAllData();
 }
 
 function parseTeamData(competitor) {
+    const teamId = competitor.team.id;
     const name = competitor.team.shortDisplayName || competitor.team.name;
     const score = competitor.score ?? '0';
     const logo = competitor.team.logo || '';
     
-    // Extract ranking reliably from ESPN payload
+    // Check rankings map
     let rank = '';
-    if (competitor.curRank && competitor.curRank <= 25) {
-        rank = `#${competitor.curRank}`;
-    } else if (competitor.rank && competitor.rank <= 25) {
-        rank = `#${competitor.rank}`;
+    const mappedRank = rankingsMap[teamId];
+    if (mappedRank && mappedRank <= 25) {
+        rank = `#${mappedRank}`;
     }
 
     return { name, score, logo, rank };
@@ -170,7 +198,7 @@ function startTickerAnimation() {
 }
 
 // Initial fetch
-fetchScores();
+fetchAllData();
 
 // Refresh data every 60 seconds
-setInterval(fetchScores, 60000);
+setInterval(fetchAllData, 60000);
