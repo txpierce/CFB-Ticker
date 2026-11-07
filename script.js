@@ -1,21 +1,38 @@
-const API_URL = 'https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=200';
-
+let currentQuery = 'groups=80'; // Default to All FBS
 let gamesData = [];
 let currentIndex = 0;
 let slideInterval = null;
 
 async function fetchScores() {
+    const API_URL = `https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?${currentQuery}&limit=200`;
+
     try {
         const response = await fetch(API_URL);
         const data = await response.json();
-        gamesData = data.events || [];
+        let events = data.events || [];
         
+        // Handle custom client-side filters
+        if (currentQuery === 'top25') {
+            events = events.filter(event => {
+                const comp = event.competitions[0];
+                return comp.competitors.some(c => c.curRank && c.curRank <= 25);
+            });
+        } else if (currentQuery === 'live') {
+            events = events.filter(event => event.status.type.state === 'in');
+        }
+
+        gamesData = events;
+        currentIndex = 0; // Reset scroll index on refresh/filter change
+
         if (gamesData.length > 0) {
             renderTickerItems();
             startTickerAnimation();
         } else {
-            document.getElementById('ticker-container').innerHTML = `
-                <div class="ticker-item"><span style="margin: auto;">No games scheduled for today.</span></div>
+            const tickerContainer = document.getElementById('ticker-container');
+            if (slideInterval) clearInterval(slideInterval);
+            tickerContainer.style.transform = 'translateY(0px)';
+            tickerContainer.innerHTML = `
+                <div class="ticker-item"><span style="margin: auto;">No matching games found right now.</span></div>
             `;
         }
     } catch (error) {
@@ -26,15 +43,23 @@ async function fetchScores() {
     }
 }
 
+function changeFilter() {
+    const selectElement = document.getElementById('filter-select');
+    currentQuery = selectElement.value;
+    fetchScores();
+}
+
 function parseTeamData(competitor) {
     const name = competitor.team.shortDisplayName || competitor.team.name;
     const score = competitor.score ?? '0';
     const logo = competitor.team.logo || '';
     
-    // Check if team has a ranking (ESPN stores it under curRank or rank)
+    // Extract ranking reliably from ESPN payload
     let rank = '';
     if (competitor.curRank && competitor.curRank <= 25) {
         rank = `#${competitor.curRank}`;
+    } else if (competitor.rank && competitor.rank <= 25) {
+        rank = `#${competitor.rank}`;
     }
 
     return { name, score, logo, rank };
@@ -85,7 +110,7 @@ function renderTickerItems() {
         `;
     });
 
-    // Duplicate the first item for seamless infinite loop illusion
+    // Duplicate first item for seamless infinite loop
     if (gamesData.length > 0) {
         const firstEvent = gamesData[0];
         const comp = firstEvent.competitions[0];
@@ -130,7 +155,6 @@ function startTickerAnimation() {
         
         tickerContainer.style.transform = `translateY(-${currentIndex * 80}px)`;
 
-        // Seamless infinite loop reset
         if (currentIndex >= gamesData.length) {
             setTimeout(() => {
                 tickerContainer.style.transition = 'none';
@@ -148,5 +172,5 @@ function startTickerAnimation() {
 // Initial fetch
 fetchScores();
 
-// Refresh data from ESPN every 60 seconds
+// Refresh data every 60 seconds
 setInterval(fetchScores, 60000);
