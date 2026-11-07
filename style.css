@@ -22,7 +22,6 @@ body {
     padding: 0 5px;
 }
 
-/* ESPN-style bold athletic header */
 .top-bar h1 {
     margin: 0;
     font-size: 20px;
@@ -34,6 +33,32 @@ body {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.top-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Toggle Grid Button */
+.grid-toggle-btn {
+    background-color: #1a1412;
+    color: #d97706;
+    border: 1px solid #3d2c22;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+}
+
+.grid-toggle-btn:hover, .grid-toggle-btn.active {
+    background-color: #d97706;
+    color: #120f0d;
+    border-color: #d97706;
 }
 
 /* Subtle Filter Dropdown */
@@ -59,7 +84,7 @@ body {
 .ticker-wrap {
     width: 100%;
     max-width: 650px;
-    height: 80px; /* Locked to exact card height */
+    height: 80px;
     overflow: hidden;
     background-color: #181210;
     border-radius: 6px;
@@ -90,7 +115,7 @@ body {
     transition: transform 0.6s ease-in-out;
 }
 
-/* Individual Score Item - Fixed strictly to 80px */
+/* Individual Score Item */
 .ticker-item {
     height: 80px;
     min-height: 80px;
@@ -103,6 +128,55 @@ body {
     font-size: 15px;
     font-weight: bold;
     box-sizing: border-box;
+}
+
+/* Live Ranked Grid Container Layout */
+.grid-container {
+    width: 100%;
+    max-width: 650px;
+    max-height: 70vh;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+}
+
+/* Individual Grid Card */
+.grid-card {
+    background-color: #181210;
+    border: 1px solid #3d2c22;
+    border-radius: 6px;
+    padding: 14px 16px;
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.grid-card:hover {
+    border-color: #d97706;
+}
+
+.grid-status {
+    background-color: #211915;
+    border: 1px solid #3d2c22;
+    padding: 3px 8px;
+    border-radius: 3px;
+    color: #d97706;
+    font-size: 10px;
+    text-transform: uppercase;
+    text-align: center;
+    align-self: flex-start;
+}
+
+.grid-team-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: bold;
 }
 
 .team-info {
@@ -157,7 +231,7 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 280px;
+    max-width: 200px;
 }
 
 .score {
@@ -178,17 +252,6 @@ body {
     text-align: center;
     min-width: 115px;
     flex-shrink: 0;
-}
-
-/* Flash alert styling when a team scores */
-.score-flash {
-    color: #ef4444 !important;
-    animation: pulseScore 1s infinite alternate;
-}
-
-@keyframes pulseScore {
-    0% { opacity: 1; }
-    100% { opacity: 0.4; }
 }
 
 /* Modal Popup Window */
@@ -231,4 +294,3 @@ body {
 
 .close-btn:hover {
     color: #f5f0eb;
-}
