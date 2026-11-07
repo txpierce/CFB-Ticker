@@ -22,7 +22,7 @@ header h1 {
 /* Vertical Ticker Box Container */
 .ticker-wrap {
     width: 100%;
-    max-width: 450px;
+    max-width: 500px;
     height: 80px; /* Exact height of one score card */
     overflow: hidden;
     background-color: #1e1e1e;
@@ -45,7 +45,7 @@ header h1 {
     height: 80px;
     min-height: 80px;
     max-height: 80px;
-    flex-shrink: 0; /* CRITICAL: Prevents flexbox from squishing items */
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -59,18 +59,28 @@ header h1 {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    flex-grow: 1;
+    margin-right: 15px;
 }
 
 .team-row {
     display: flex;
     justify-content: space-between;
-    width: 250px;
+    align-items: center;
+}
+
+.team-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
 }
 
 .score {
     color: #4cd137;
     font-family: monospace;
     font-size: 16px;
+    font-weight: bold;
 }
 
 .status-badge {
@@ -81,5 +91,6 @@ header h1 {
     font-size: 11px;
     text-transform: uppercase;
     text-align: center;
-    min-width: 85px;
+    min-width: 95px;
+    flex-shrink: 0;
 }
