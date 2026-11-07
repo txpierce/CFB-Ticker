@@ -16,7 +16,6 @@ async function fetchRankings() {
         rankingsMap = {};
 
         if (data.rankings && data.rankings.length > 0) {
-            // Usually the first poll is the AP Top 25 or CFP Rankings
             const topPoll = data.rankings[0]; 
             if (topPoll && topPoll.ranks) {
                 topPoll.ranks.forEach(item => {
@@ -50,7 +49,7 @@ async function fetchScores() {
         }
 
         gamesData = events;
-        currentIndex = 0; // Reset scroll index on refresh/filter change
+        currentIndex = 0; // Reset scroll index on filter change
 
         if (gamesData.length > 0) {
             renderTickerItems();
@@ -83,7 +82,6 @@ function parseTeamData(competitor) {
     const score = competitor.score ?? '0';
     const logo = competitor.team.logo || '';
     
-    // Check rankings map
     let rank = '';
     const mappedRank = rankingsMap[teamId];
     if (mappedRank && mappedRank <= 25) {
@@ -108,10 +106,23 @@ function renderTickerItems() {
         const statusType = event.status.type.state; // 'pre', 'in', 'post'
         const statusDetail = event.status.type.detail; 
 
+        // Extract broadcast TV channel (e.g., ABC, ESPN, FOX) if available
+        let tvChannel = '';
+        if (competition.broadcasts && competition.broadcasts.length > 0) {
+            // Find the first valid broadcast network name
+            const broadcast = competition.broadcasts.find(b => b.names && b.names.length > 0);
+            if (broadcast) {
+                tvChannel = broadcast.names[0];
+            }
+        }
+
         let displayStatus = statusDetail;
         if (statusType === 'pre') {
             displayStatus = event.status.type.shortDetail; // e.g., "7:30 PM"
         }
+
+        // Combine status and TV network into the badge layout
+        const badgeContent = tvChannel ? `${displayStatus} • ${tvChannel}` : displayStatus;
 
         html += `
             <div class="ticker-item">
@@ -133,7 +144,7 @@ function renderTickerItems() {
                         <span class="score">${home.score}</span>
                     </div>
                 </div>
-                <div class="status-badge">${displayStatus}</div>
+                <div class="status-badge">${badgeContent}</div>
             </div>
         `;
     });
@@ -144,6 +155,14 @@ function renderTickerItems() {
         const comp = firstEvent.competitions[0];
         const home = parseTeamData(comp.competitors.find(c => c.homeAway === 'home'));
         const away = parseTeamData(comp.competitors.find(c => c.homeAway === 'away'));
+        
+        let tvChannel = '';
+        if (comp.broadcasts && comp.broadcasts.length > 0) {
+            const broadcast = comp.broadcasts.find(b => b.names && b.names.length > 0);
+            if (broadcast) tvChannel = broadcast.names[0];
+        }
+        const firstStatus = firstEvent.status.type.shortDetail;
+        const badgeContent = tvChannel ? `${firstStatus} • ${tvChannel}` : firstStatus;
         
         html += `
             <div class="ticker-item">
@@ -165,7 +184,7 @@ function renderTickerItems() {
                         <span class="score">${home.score}</span>
                     </div>
                 </div>
-                <div class="status-badge">${firstEvent.status.type.shortDetail}</div>
+                <div class="status-badge">${badgeContent}</div>
             </div>
         `;
     }
