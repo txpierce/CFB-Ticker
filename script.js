@@ -26,19 +26,31 @@ async function fetchScores() {
     }
 }
 
+function parseTeamData(competitor) {
+    const name = competitor.team.shortDisplayName || competitor.team.name;
+    const score = competitor.score ?? '0';
+    const logo = competitor.team.logo || '';
+    
+    // Check if team has a ranking (ESPN stores it under curRank or rank)
+    let rank = '';
+    if (competitor.curRank && competitor.curRank <= 25) {
+        rank = `#${competitor.curRank}`;
+    }
+
+    return { name, score, logo, rank };
+}
+
 function renderTickerItems() {
     const tickerContainer = document.getElementById('ticker-container');
     let html = '';
 
     gamesData.forEach(event => {
         const competition = event.competitions[0];
-        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
-        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+        const homeCompetitor = competition.competitors.find(c => c.homeAway === 'home');
+        const awayCompetitor = competition.competitors.find(c => c.homeAway === 'away');
 
-        const homeName = homeTeam.team.shortDisplayName;
-        const homeScore = homeTeam.score ?? '0';
-        const awayName = awayTeam.team.shortDisplayName;
-        const awayScore = awayTeam.score ?? '0';
+        const home = parseTeamData(homeCompetitor);
+        const away = parseTeamData(awayCompetitor);
 
         const statusType = event.status.type.state; // 'pre', 'in', 'post'
         const statusDetail = event.status.type.detail; 
@@ -52,12 +64,20 @@ function renderTickerItems() {
             <div class="ticker-item">
                 <div class="team-info">
                     <div class="team-row">
-                        <span class="team-name">${awayName}</span>
-                        <span class="score">${awayScore}</span>
+                        <div class="team-left">
+                            ${away.rank ? `<span class="team-rank">${away.rank}</span>` : ''}
+                            ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
+                            <span class="team-name">${away.name}</span>
+                        </div>
+                        <span class="score">${away.score}</span>
                     </div>
                     <div class="team-row">
-                        <span class="team-name">${homeName}</span>
-                        <span class="score">${homeScore}</span>
+                        <div class="team-left">
+                            ${home.rank ? `<span class="team-rank">${home.rank}</span>` : ''}
+                            ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
+                            <span class="team-name">${home.name}</span>
+                        </div>
+                        <span class="score">${home.score}</span>
                     </div>
                 </div>
                 <div class="status-badge">${displayStatus}</div>
@@ -65,23 +85,31 @@ function renderTickerItems() {
         `;
     });
 
-    // Duplicate the first item at the end for the infinite loop illusion
+    // Duplicate the first item for seamless infinite loop illusion
     if (gamesData.length > 0) {
         const firstEvent = gamesData[0];
-        const competition = firstEvent.competitions[0];
-        const homeTeam = competition.competitors.find(c => c.homeAway === 'home');
-        const awayTeam = competition.competitors.find(c => c.homeAway === 'away');
+        const comp = firstEvent.competitions[0];
+        const home = parseTeamData(comp.competitors.find(c => c.homeAway === 'home'));
+        const away = parseTeamData(comp.competitors.find(c => c.homeAway === 'away'));
         
         html += `
             <div class="ticker-item">
                 <div class="team-info">
                     <div class="team-row">
-                        <span class="team-name">${awayTeam.team.shortDisplayName}</span>
-                        <span class="score">${awayTeam.score ?? '0'}</span>
+                        <div class="team-left">
+                            ${away.rank ? `<span class="team-rank">${away.rank}</span>` : ''}
+                            ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
+                            <span class="team-name">${away.name}</span>
+                        </div>
+                        <span class="score">${away.score}</span>
                     </div>
                     <div class="team-row">
-                        <span class="team-name">${homeTeam.team.shortDisplayName}</span>
-                        <span class="score">${homeTeam.score ?? '0'}</span>
+                        <div class="team-left">
+                            ${home.rank ? `<span class="team-rank">${home.rank}</span>` : ''}
+                            ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
+                            <span class="team-name">${home.name}</span>
+                        </div>
+                        <span class="score">${home.score}</span>
                     </div>
                 </div>
                 <div class="status-badge">${firstEvent.status.type.shortDetail}</div>
@@ -100,7 +128,6 @@ function startTickerAnimation() {
         currentIndex++;
         const tickerContainer = document.getElementById('ticker-container');
         
-        // Slide up by 80px per item
         tickerContainer.style.transform = `translateY(-${currentIndex * 80}px)`;
 
         // Seamless infinite loop reset
