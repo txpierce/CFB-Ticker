@@ -10,26 +10,54 @@
 
     <header>
         <h1>CFB Live Ticker</h1>
-        <!-- Filter Controls -->
-        <div class="filter-container">
-            <label for="filter-select">View:</label>
-            <select id="filter-select" onchange="changeFilter()">
-                <option value="groups=80">All FBS Games</option>
-                <option value="top25">Top 25 Matchups Only</option>
-                <option value="live">Live Games Only</option>
-                <option value="groups=8">SEC</option>
-                <option value="groups=5">Big Ten</option>
-                <option value="groups=4">Big 12</option>
-                <option value="groups=1">ACC</option>
-                <option value="groups=17">Mountain West</option>
-            </select>
+        
+        <!-- Controls Bar: Filter, Date Picker, and Manual Navigation -->
+        <div class="controls-bar">
+            <div class="filter-container">
+                <select id="filter-select" onchange="changeFilter()">
+                    <option value="groups=80">All FBS Games</option>
+                    <option value="favorites">⭐ My Favorites Only</option>
+                    <option value="top25">Top 25 Matchups Only</option>
+                    <option value="live">Live Games Only</option>
+                    <option value="groups=8">SEC</option>
+                    <option value="groups=5">Big Ten</option>
+                    <option value="groups=4">Big 12</option>
+                    <option value="groups=1">ACC</option>
+                    <option value="groups=151">FBS Independents</option>
+                    <option value="groups=37">American Athletic</option>
+                    <option value="groups=12">Conference USA</option>
+                    <option value="groups=15">Mid-American (MAC)</option>
+                    <option value="groups=17">Mountain West</option>
+                    <option value="groups=9">Sun Belt</option>
+                </select>
+                
+                <!-- Date Picker -->
+                <input type="date" id="date-picker" onchange="changeDate()">
+            </div>
+
+            <!-- Manual Ticker Navigation Controls -->
+            <div class="nav-controls">
+                <button onclick="prevCard()" title="Previous Game">◀</button>
+                <button id="play-pause-btn" onclick="togglePlayPause()" title="Pause / Play">⏸</button>
+                <button onclick="nextCard()" title="Next Game">▶</button>
+            </div>
         </div>
     </header>
 
     <!-- Scrolling Ticker Container -->
-    <div class="ticker-wrap">
+    <div class="ticker-wrap" onclick="openGameModal()">
         <div class="ticker" id="ticker-container">
             <div class="ticker-item"><span style="margin: auto;">Loading live scores from ESPN...</span></div>
+        </div>
+    </div>
+
+    <!-- Game Detail Modal Popup -->
+    <div id="game-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeGameModal()">&times;</span>
+            <div id="modal-body">
+                <h3>Loading Game Details...</h3>
+            </div>
         </div>
     </div>
 
