@@ -8,25 +8,28 @@
 </head>
 <body>
 
-    <!-- Single-Line Header Bar -->
+    <!-- Single-Line Top Bar with Toggle Button -->
     <header class="top-bar">
         <h1>College Football Scoreboard</h1>
-        <select id="filter-select" onchange="changeFilter()">
-            <option value="groups=80">All FBS Games</option>
-            <option value="favorites">⭐ My Favorites Only</option>
-            <option value="top25">Top 25 Matchups Only</option>
-            <option value="live">Live Games Only</option>
-            <option value="groups=8">SEC</option>
-            <option value="groups=5">Big Ten</option>
-            <option value="groups=4">Big 12</option>
-            <option value="groups=1">ACC</option>
-            <option value="groups=151">FBS Independents</option>
-            <option value="groups=37">American Athletic</option>
-            <option value="groups=12">Conference USA</option>
-            <option value="groups=15">Mid-American (MAC)</option>
-            <option value="groups=17">Mountain West</option>
-            <option value="groups=9">Sun Belt</option>
-        </select>
+        <div class="top-controls">
+            <button id="grid-toggle-btn" class="grid-toggle-btn" onclick="toggleGridView()">Live Ranked Grid</button>
+            <select id="filter-select" onchange="changeFilter()">
+                <option value="groups=80">All FBS Games</option>
+                <option value="favorites">⭐ My Favorites Only</option>
+                <option value="top25">Top 25 Matchups Only</option>
+                <option value="live">Live Games Only</option>
+                <option value="groups=8">SEC</option>
+                <option value="groups=5">Big Ten</option>
+                <option value="groups=4">Big 12</option>
+                <option value="groups=1">ACC</option>
+                <option value="groups=151">FBS Independents</option>
+                <option value="groups=37">American Athletic</option>
+                <option value="groups=12">Conference USA</option>
+                <option value="groups=15">Mid-American (MAC)</option>
+                <option value="groups=17">Mountain West</option>
+                <option value="groups=9">Sun Belt</option>
+            </select>
+        </div>
     </header>
 
     <!-- Scrolling Ticker Container -->
@@ -35,6 +38,9 @@
             <div class="ticker-item"><span style="margin: auto;">Loading live scores...</span></div>
         </div>
     </div>
+
+    <!-- Live Ranked Grid View Container (Hidden by default) -->
+    <div id="grid-container" class="grid-container" style="display: none;"></div>
 
     <!-- Game Detail Modal Popup -->
     <div id="game-modal" class="modal">
