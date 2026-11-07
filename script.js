@@ -4,6 +4,7 @@ let previousScores = {};
 let rankingsMap = {};
 let currentIndex = 0;
 let slideInterval = null;
+let isGridView = false;
 const CARD_HEIGHT = 80;
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -11,7 +12,6 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 async function fetchAllData() {
-    // Run rankings and scores concurrently, but don't let rankings failure block the scoreboard
     await Promise.allSettled([
         fetchRankings(),
         fetchScores()
@@ -34,7 +34,7 @@ async function fetchRankings() {
             }
         }
     } catch (error) {
-        console.warn('Rankings fetch failed, proceeding without rankings:', error);
+        console.warn('Rankings fetch failed:', error);
     }
 }
 
@@ -65,28 +65,113 @@ async function fetchScores() {
         gamesData = events;
         if (currentIndex >= gamesData.length) currentIndex = 0;
 
-        const tickerContainer = document.getElementById('ticker-container');
         if (gamesData.length > 0) {
-            renderTickerItems();
-            startTickerAnimation();
+            if (isGridView) {
+                renderGridView();
+            } else {
+                renderTickerItems();
+                startTickerAnimation();
+            }
         } else {
+            const tickerContainer = document.getElementById('ticker-container');
             if (slideInterval) clearInterval(slideInterval);
             tickerContainer.style.transform = 'translateY(0px)';
             tickerContainer.innerHTML = `
                 <div class="ticker-item"><span style="margin: auto;">No matching games found.</span></div>
             `;
+            document.getElementById('grid-container').innerHTML = `<div style="text-align: center; color: #8c7355; padding: 40px; grid-column: 1/-1;">No matching games found.</div>`;
         }
     } catch (error) {
         console.error('Error fetching scoreboard:', error);
-        document.getElementById('ticker-container').innerHTML = `
-            <div class="ticker-item"><span style="margin: auto;">Failed to load scores. Check console.</span></div>
-        `;
     }
 }
 
 function changeFilter() {
     currentQuery = document.getElementById('filter-select').value;
     fetchAllData();
+}
+
+function toggleGridView() {
+    isGridView = !isGridView;
+    const btn = document.getElementById('grid-toggle-btn');
+    const tickerWrap = document.querySelector('.ticker-wrap');
+    const gridContainer = document.getElementById('grid-container');
+
+    if (isGridView) {
+        btn.textContent = 'Ticker View';
+        btn.classList.add('active');
+        tickerWrap.style.display = 'none';
+        gridContainer.style.display = 'grid';
+        if (slideInterval) clearInterval(slideInterval);
+        renderGridView();
+    } else {
+        btn.textContent = 'Live Ranked Grid';
+        btn.classList.remove('active');
+        tickerWrap.style.display = 'block';
+        gridContainer.style.display = 'none';
+        renderTickerItems();
+        startTickerAnimation();
+    }
+}
+
+function renderGridView() {
+    const gridContainer = document.getElementById('grid-container');
+    
+    // Filter for live games where at least one team is ranked in the top 25
+    const liveRankedGames = gamesData.filter(event => {
+        const isLive = event.status.type.state === 'in';
+        const comp = event.competitions[0];
+        const hasRankedTeam = comp.competitors.some(c => rankingsMap[c.team.id] && rankingsMap[c.team.id] <= 25);
+        return isLive && hasRankedTeam;
+    });
+
+    if (liveRankedGames.length === 0) {
+        gridContainer.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #8c7355; padding: 40px;">No live ranked games right now.</div>`;
+        return;
+    }
+
+    let html = '';
+    liveRankedGames.forEach(event => {
+        const competition = event.competitions[0];
+        const homeComp = competition.competitors.find(c => c.homeAway === 'home');
+        const awayComp = competition.competitors.find(c => c.homeAway === 'away');
+
+        const home = parseTeamData(homeComp);
+        const away = parseTeamData(awayComp);
+
+        const statusDetail = event.status.type.detail;
+        let tvChannel = '';
+        if (competition.broadcasts && competition.broadcasts.length > 0) {
+            const b = competition.broadcasts.find(x => x.names && x.names.length > 0);
+            if (b) tvChannel = b.names[0];
+        }
+        const badgeContent = tvChannel ? `${statusDetail} • ${tvChannel}` : statusDetail;
+
+        html += `
+            <div class="grid-card" onclick="openGameModalById('${event.id}')">
+                <div class="grid-status">${badgeContent}</div>
+                <div class="grid-team-row">
+                    <div class="team-left">
+                        <button class="star-btn ${away.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${away.teamId}')">★</button>
+                        ${away.rank ? `<span class="team-rank">${away.rank}</span>` : ''}
+                        ${away.logo ? `<img class="team-logo" src="${away.logo}" alt="">` : ''}
+                        <span class="team-name">${away.name}</span>
+                    </div>
+                    <span class="score">${away.score}</span>
+                </div>
+                <div class="grid-team-row">
+                    <div class="team-left">
+                        <button class="star-btn ${home.isFav ? 'favorited' : ''}" onclick="toggleFavorite(event, '${home.teamId}')">★</button>
+                        ${home.rank ? `<span class="team-rank">${home.rank}</span>` : ''}
+                        ${home.logo ? `<img class="team-logo" src="${home.logo}" alt="">` : ''}
+                        <span class="team-name">${home.name}</span>
+                    </div>
+                    <span class="score">${home.score}</span>
+                </div>
+            </div>
+        `;
+    });
+    gridContainer.innerHTML = html;
 }
 
 function getFavorites() {
@@ -106,7 +191,8 @@ function toggleFavorite(event, teamId) {
         favorites.push(teamId);
     }
     localStorage.setItem('cfb_favorites', JSON.stringify(favorites));
-    renderTickerItems();
+    if (isGridView) renderGridView();
+    else renderTickerItems();
 }
 
 function parseTeamData(competitor) {
@@ -259,6 +345,7 @@ function renderTickerItems() {
 
 function startTickerAnimation() {
     if (slideInterval) clearInterval(slideInterval);
+    if (isGridView) return;
 
     slideInterval = setInterval(() => {
         currentIndex++;
@@ -279,9 +366,17 @@ function startTickerAnimation() {
 }
 
 // Modal Detail Popup
-async function openGameModal() {
+function openGameModal() {
     if (gamesData.length === 0) return;
     const activeEvent = gamesData[currentIndex % gamesData.length];
+    fetchAndShowModal(activeEvent.id);
+}
+
+function openGameModalById(eventId) {
+    fetchAndShowModal(eventId);
+}
+
+async function fetchAndShowModal(eventId) {
     const modal = document.getElementById('game-modal');
     const modalBody = document.getElementById('modal-body');
     
@@ -289,7 +384,7 @@ async function openGameModal() {
     modalBody.innerHTML = '<h3>Loading live game stats...</h3>';
 
     try {
-        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=${activeEvent.id}`);
+        const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=${eventId}`);
         const summary = await res.json();
         
         const comp = summary.header.competitions[0];
