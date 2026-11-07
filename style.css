@@ -3,7 +3,7 @@ body {
     background-color: #121212;
     color: #ffffff;
     margin: 0;
-    padding: 40px 20px;
+    padding: 30px 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -11,12 +11,13 @@ body {
 
 header {
     text-align: center;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
+    width: 100%;
+    max-width: 560px;
 }
 
-/* Dynamic athletic header */
 header h1 {
-    margin: 0 0 12px 0;
+    margin: 0 0 15px 0;
     font-size: 32px;
     font-weight: 900;
     font-style: italic;
@@ -28,35 +29,63 @@ header h1 {
     text-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
-/* Filter Dropdown Styling */
-.filter-container {
+.controls-bar {
     display: flex;
+    flex-direction: column;
+    gap: 10px;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    font-size: 14px;
-    color: #b0b0b0;
+    background: #1a1a1a;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
 }
 
-.filter-container select {
-    background-color: #1e1e1e;
+.filter-container {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+}
+
+.filter-container select, .filter-container input {
+    background-color: #252525;
     color: #ffffff;
     border: 1px solid #444;
-    padding: 6px 12px;
+    padding: 8px 12px;
     border-radius: 6px;
     font-weight: bold;
     cursor: pointer;
     outline: none;
 }
 
-.filter-container select:hover {
+.filter-container select:hover, .filter-container input:hover {
+    border-color: #cf0a2c;
+}
+
+.nav-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.nav-controls button {
+    background-color: #2c2c2c;
+    color: #fff;
+    border: 1px solid #444;
+    padding: 6px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.nav-controls button:hover {
+    background-color: #cf0a2c;
     border-color: #cf0a2c;
 }
 
 /* Vertical Ticker Box Container */
 .ticker-wrap {
     width: 100%;
-    max-width: 520px;
+    max-width: 560px;
     height: 80px;
     overflow: hidden;
     background-color: #1e1e1e;
@@ -65,6 +94,20 @@ header h1 {
     border-top: 3px solid #cf0a2c;
     border-bottom: 3px solid #cf0a2c;
     position: relative;
+    cursor: pointer;
+}
+
+.ticker-wrap:hover::after {
+    content: "Click for Game Details";
+    position: absolute;
+    bottom: 4px;
+    right: 8px;
+    font-size: 10px;
+    color: #888;
+    background: rgba(0,0,0,0.6);
+    padding: 2px 6px;
+    border-radius: 3px;
+    pointer-events: none;
 }
 
 /* The rolling list container */
@@ -106,8 +149,21 @@ header h1 {
 .team-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     overflow: hidden;
+}
+
+.star-btn {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+}
+
+.star-btn.favorited {
+    color: #fbc531;
 }
 
 .team-logo {
@@ -121,14 +177,14 @@ header h1 {
     font-size: 12px;
     color: #fbc531;
     font-weight: bold;
-    min-width: 20px;
+    min-width: 18px;
 }
 
 .team-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 220px;
+    max-width: 190px;
 }
 
 .score {
@@ -146,6 +202,59 @@ header h1 {
     font-size: 11px;
     text-transform: uppercase;
     text-align: center;
-    min-width: 95px;
+    min-width: 105px;
     flex-shrink: 0;
+}
+
+/* Flash alert styling when a team scores */
+.score-flash {
+    color: #ff4757 !important;
+    animation: pulseScore 1s infinite alternate;
+}
+
+@keyframes pulseScore {
+    0% { opacity: 1; }
+    100% { opacity: 0.4; }
+}
+
+/* Modal Popup Window */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.8);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background-color: #1a1a1a;
+    border: 1px solid #444;
+    padding: 25px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    color: #fff;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.7);
+}
+
+.close-btn {
+    color: #aaa;
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-btn:hover {
+    color: #fff;
 }
